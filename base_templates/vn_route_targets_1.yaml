@@ -1,0 +1,34 @@
+resources:
+  vip_vn:
+    type: OS::ContrailV2::VirtualNetwork
+    properties:
+      import_route_target_list:
+        {
+          import_route_target_list_route_target: [ { get_param: imp_rt_1 } , { get_param: imp_rt_2 } ]
+        }
+      export_route_target_list:
+        {
+          export_route_target_list_route_target: [ { get_param: exp_rt_1 } ]
+        }
+      route_target_list:
+        {
+          route_target_list_route_target: [{ get_param: rt }],
+        }
+        
+resources:
+  vip_vn:
+    type: OS::ContrailV2::VirtualNetwork
+    properties:
+      name: { get_param: name}
+      import_route_target_list:
+        {
+          import_route_target_list_route_target: [ 'target:65500:131' , 'target:65500:241' ]
+        }
+      export_route_target_list:
+        {
+          export_route_target_list_route_target: [ 'target:65500:201' ]
+        }
+      route_target_list:
+        {
+          route_target_list_route_target: ['target:65500:101'],
+        }

@@ -1,0 +1,81 @@
+heat_template_version: 2015-04-30
+
+parameters:
+  name:
+    type: string
+  rt:
+    type: string
+  prefix:
+    type: string
+  mask:
+    type: string
+  ipam:
+    type: string
+  flavor:
+    type: string
+  image:
+    type: string
+  as_vm:
+    type: string
+
+resources:
+  out_vn:
+    type: OS::ContrailV2::VirtualNetwork
+    properties:
+      name: { get_param: name}
+      network_ipam_refs: [{ get_param: ipam }]
+      route_target_list:
+        {
+          route_target_list_route_target: [{ get_param: rt }],
+        }
+      network_ipam_refs_data:
+        [{
+          network_ipam_refs_data_ipam_subnets:
+            [{
+              network_ipam_refs_data_ipam_subnets_subnet:
+                {
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix: { get_param: prefix },
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len: { get_param: mask },
+                },
+                network_ipam_refs_data_ipam_subnets_addr_from_start: 'true' ,
+            }]
+        }]
+
+  vmi1:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ out_vn, fq_name ] } ] }]
+
+  iip_1:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi1, out_vn ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi1 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ out_vn, fq_name ] } ] }]
+
+  bgpaas:
+    type: OS::ContrailV2::BgpAsAService
+    properties:
+       virtual_machine_interface_refs: [{ get_resource: vmi1  }]
+       autonomous_system: { get_param: as_vm }
+       bgpaas_session_attributes:
+        {
+           bgpaas_session_attributes_address_families:
+             {
+               bgpaas_session_attributes_address_families_family: ['inet'],
+             },
+        }
+
+  vm_1:
+    type: OS::Nova::Server
+    depends_on: [iip_1]
+    properties:
+      name: 'bgpaas'
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      user_data_format: RAW
+      user_data:
+         get_file: './bgpaas_vsrx.txt'
+      networks:
+        - network: 'mgmt'
+        - port: { get_resource: vmi1 }

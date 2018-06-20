@@ -1,0 +1,117 @@
+heat_template_version: 2015-04-30
+
+parameters:
+  name:
+    type: string
+  ipam:
+    type: string
+  prefix:
+    type: string
+  mask:
+    type: string
+  mgmt-net:
+    type: string
+  vmname1:
+    type: string
+  vmname2:
+    type: string
+  vmname3:
+    type: string
+  vmimage:
+    type: string
+  vmflavor:
+    type: string
+  mac:
+    type: string
+
+resources:
+  new_vn:
+    type: OS::ContrailV2::VirtualNetwork
+    properties:
+      name: { get_param: name}
+      network_ipam_refs: [{ get_param: ipam }]
+      network_ipam_refs_data:
+        [{
+          network_ipam_refs_data_ipam_subnets:
+            [{
+              network_ipam_refs_data_ipam_subnets_subnet:
+                {
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix: { get_param: prefix },
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len: { get_param: mask },
+                },
+            }]
+        }]
+
+#VM1
+  vmi1:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ new_vn, fq_name ] } ] }]
+
+  iip_1:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi1, new_vn ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi1 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ new_vn, fq_name ] } ] }]
+
+  vm1: 
+    type: OS::Nova::Server 
+    depends_on: [vmi1, new_vn]
+    properties: 
+      name: { get_param: vmname1 } 
+      image: { get_param: vmimage } 
+      flavor: { get_param: vmflavor } 
+      networks: 
+        - port: { get_resource: vmi1 } 
+
+#VM2
+  vmi2:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [ {get_param: mgmt-net} ]
+
+  iip_2:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi2 ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi2 }]
+      virtual_network_refs: [{ get_param: mgmt-net }]
+
+  vm2: 
+    type: OS::Nova::Server 
+    depends_on: [vmi2]
+    properties: 
+      name: { get_param: vmname2 } 
+      image: { get_param: vmimage } 
+      flavor: { get_param: vmflavor } 
+      networks: 
+        - port: { get_resource: vmi2 } 
+
+#VM3
+  vmi3:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ new_vn, fq_name ] } ] }]
+      virtual_machine_interface_mac_addresses: 
+        {
+            virtual_machine_interface_mac_addresses_mac_address: [{ get_param: mac }],
+        }
+
+  iip_3:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi3, new_vn ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi3 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ new_vn, fq_name ] } ] }]
+      instance_ip_address: '192.168.5.100'
+
+  vm3: 
+    type: OS::Nova::Server 
+    depends_on: [vmi3, new_vn]
+    properties: 
+      name: { get_param: vmname3 } 
+      image: { get_param: vmimage } 
+      flavor: { get_param: vmflavor } 
+      networks: 
+        - port: { get_resource: vmi3 } 

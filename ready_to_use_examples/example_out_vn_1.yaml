@@ -1,0 +1,55 @@
+heat_template_version: 2015-04-30
+
+parameters:
+  name:
+    type: string
+  imp_rt_1:
+    type: string
+  rt:
+    type: string
+  prefix:
+    type: string
+  mask:
+    type: string
+  ipam:
+    type: string
+  flavor:
+    type: string
+  image:
+    type: string
+
+resources:
+  out_vn:
+    type: OS::ContrailV2::VirtualNetwork
+    properties:
+      name: { get_param: name}
+      import_route_target_list:
+        {
+          import_route_target_list_route_target: [ { get_param: imp_rt_1 } ]
+        }
+      network_ipam_refs: [{ get_param: ipam }]
+      route_target_list:
+        {
+          route_target_list_route_target: [{ get_param: rt }],
+        }
+      network_ipam_refs_data:
+        [{
+          network_ipam_refs_data_ipam_subnets:
+            [{
+              network_ipam_refs_data_ipam_subnets_subnet:
+                {
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix: { get_param: prefix },
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len: { get_param: mask },
+                },
+                network_ipam_refs_data_ipam_subnets_addr_from_start: 'true' ,
+            }]
+        }]
+
+  vm_1:
+    type: OS::Nova::Server
+    properties:
+      name: 'out_vm'
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      networks:
+        - network: { get_resource: out_vn }

@@ -1,0 +1,55 @@
+heat_template_version: 2015-04-30
+
+resources:
+
+###VMI CUSTOM MAC, ATTACHED TO NEW VN net_vn
+  vmi_obj:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      name: { get_param: vmi_name }
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ net_vn, fq_name ] } ] }]
+      port_security_enabled: { get_param: ps}
+      virtual_machine_interface_mac_addresses: 
+        {
+            virtual_machine_interface_mac_addresses_mac_address: [{ get_param: mac }],
+        }
+
+###VMI ATTACHED TO EXISTING NETWORK PASSED VIA PARAM ex-net (FQDN)
+  vmi_obj:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [ {get_param: ex-net} ]
+
+###INSTANCE IP ON NEW VN
+  iip_obj:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi_obj, new_vn ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi_obj }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ net_vn, fq_name ] } ] }]
+
+###INSTANCE IP O NEXISTING NETWORK
+  iip_obj:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi_obj ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi_obj }]
+      virtual_network_refs: [{ get_param: ex-net }]
+
+###INSTANCE IP WITH FIXED IP ADDRESS
+  iip_obj:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi_obj ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi_obj }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ net_vn, fq_name ] } ] }]
+      instance_ip_address: { get_param: addr }
+
+###INSTANCE IP ON EXISTING NETWORK AND FIXED IP
+  iip_obj:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi_obj ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi_obj }]
+      virtual_network_refs: [{ get_param: ex-net }]
+      instance_ip_address: { get_param: addr }

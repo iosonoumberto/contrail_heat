@@ -1,0 +1,104 @@
+heat_template_version: 2015-04-30
+
+parameters:
+  name:
+    type: string
+  fwd_mode:
+    type: string
+  rpf:
+    type: string
+  vxlan_id:
+    type: string
+  imp_rt_1:
+    type: string
+  imp_rt_2:
+    type: string
+  exp_rt_1:
+    type: string
+  dip:
+    type: string
+  sip:
+    type: string
+  dp:
+    type: string
+  sp:
+    type: string
+  proto:
+    type: string
+  ecmp:
+    type: string
+  rt:
+    type: string
+  prefix:
+    type: string
+  mask:
+    type: string
+  first:
+    type: string
+  gw:
+    type: string
+  dhcp:
+    type: string
+  start:
+    type: string
+  end:
+    type: string
+  ipam:
+    type: string
+  psec:
+    type: string
+
+resources:
+  vip_vn:
+    type: OS::ContrailV2::VirtualNetwork
+    properties:
+      name: { get_param: name}
+      virtual_network_properties:
+        {
+          virtual_network_properties_forwarding_mode: { get_param: fwd_mode},
+          virtual_network_properties_rpf: { get_param: rpf },
+          virtual_network_properties_vxlan_network_identifier: { get_param: vxlan_id},
+        }
+      flood_unknown_unicast: { get_param: flood}
+      import_route_target_list:
+        {
+          import_route_target_list_route_target: [ { get_param: imp_rt_1 } , { get_param: imp_rt_2 } ]
+        }
+      export_route_target_list:
+        {
+          export_route_target_list_route_target: [ { get_param: exp_rt_1 } ]
+        }
+      ecmp_hashing_include_fields:
+        {
+          ecmp_hashing_include_fields_destination_ip: { get_param: dip},
+          ecmp_hashing_include_fields_destination_port: { get_param: dp },
+          ecmp_hashing_include_fields_hashing_configured: { get_param: ecmp },
+          ecmp_hashing_include_fields_ip_protocol: { get_param: proto },
+          ecmp_hashing_include_fields_source_ip: { get_param: sip },
+          ecmp_hashing_include_fields_source_port: { get_param: sp },
+        }
+      port_security_enabled: { get_param: psec }
+      network_ipam_refs: [{ get_param: ipam }]
+      route_target_list:
+        {
+          route_target_list_route_target: [{ get_param: rt }],
+        }
+      network_ipam_refs_data:
+        [{
+          network_ipam_refs_data_ipam_subnets:
+            [{
+              network_ipam_refs_data_ipam_subnets_subnet:
+                {
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix: { get_param: prefix },
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len: { get_param: mask },
+                },
+                network_ipam_refs_data_ipam_subnets_addr_from_start: { get_param: first} ,
+                network_ipam_refs_data_ipam_subnets_default_gateway: { get_param: gw },
+                network_ipam_refs_data_ipam_subnets_enable_dhcp: { get_param: dhcp },
+                network_ipam_refs_data_ipam_subnets_allocation_pools:
+                  [{
+                    network_ipam_refs_data_ipam_subnets_allocation_pools_start: { get_param: start },
+                    network_ipam_refs_data_ipam_subnets_allocation_pools_end: { get_param: end },
+                  }]
+         }]
+        }]

@@ -1,0 +1,357 @@
+heat_template_version: 2015-04-30
+
+parameters:
+  mgmt-net:
+    type: string
+    description: Name of management network to be created
+  left_name:
+    type: string
+    description: Name of left network to be created
+  right_name:
+    type: string
+    description: Name of right network to be created
+  left_vn_fqdn:
+    type: string
+    description: FQ Name of the left network
+  right_vn_fqdn:
+    type: string
+    description: FQ Name of the right network
+  domain:
+    type: string
+    description: Name of the Domain
+  service_template_name:
+    type: string
+    label: Service template fq name
+    description: Service template for port tuple
+  service_template_properties_service_mode:
+    type: string
+    description: service mode
+  service_template_properties_service_type:
+    type: string
+    description: service type
+  ipam:
+    type: string
+  service_instance_name:
+    type: string
+    label: Service instance name
+    description: Service instance for port tuple
+  service_instance_fq_name:
+    type: string
+    label: Service instance fq name
+    description: Service instance FQDN for port tuple
+  
+  left_cidr:
+    type: string
+    description: subnet prefix for left network
+  left_mask:
+    type: string
+    description: subnet prefix len for left network
+  right_cidr:
+    type: string
+    description: subnet prefix for right network
+  right_mask:
+    type: string
+    description: subnet prefix len for right network
+  
+  svc_name: 
+    type: string
+    description: Name of the SVM
+  svc_flavor: 
+    type: string
+    description: Flavor of the SVM
+  svc_image: 
+    type: string
+    description: Name of the SVM image
+  flavor: 
+    type: string
+    description: Flavor of the end VMs
+  image: 
+    type: string
+    description: Name of the end VM image
+  left_vm_name:
+    type: string
+    description: Name of the left VM
+  right_vm_name: 
+    type: string
+    description: Name of the right VM
+  pt_name:
+    type: string
+    description: Name of the port tuple
+  policy_name:
+    type: string
+    description: Name of the Policy
+  policy_fq_name:
+    type: string
+    description: FQDN of the Policy 
+  simple_action:
+    type: string
+    description: Pass or Deny
+  protocol:
+    type: string
+    description: Protocol
+  src_port_end:
+    type: number
+    description: End of the Source Port Range
+  src_port_start:
+    type: number
+    description: Start of the Source Port Range
+  direction:
+    type: string
+    description: Direction of the Policy
+  dst_port_end:
+    type: number
+    description: End of the Destination Port Range
+  dst_port_start:
+    type: number
+    description: Start of the Destination Port Range
+
+resources:
+
+  netpol:
+    type: OS::ContrailV2::NetworkPolicy
+    properties:
+      name: { get_param: policy_name }
+      network_policy_entries: {
+        network_policy_entries_policy_rule: [{ 
+          network_policy_entries_policy_rule_direction: { get_param: direction },
+          network_policy_entries_policy_rule_protocol: { get_param: protocol },
+          network_policy_entries_policy_rule_src_ports: [{
+            network_policy_entries_policy_rule_src_ports_start_port: { get_param: src_port_start },
+            network_policy_entries_policy_rule_src_ports_end_port: { get_param: src_port_end }
+                                }],
+          network_policy_entries_policy_rule_dst_ports: [{
+            network_policy_entries_policy_rule_dst_ports_start_port: { get_param: dst_port_start },
+            network_policy_entries_policy_rule_dst_ports_end_port: { get_param: dst_port_end }
+                                }],
+          network_policy_entries_policy_rule_dst_addresses: [{
+            network_policy_entries_policy_rule_dst_addresses_virtual_network: { get_param: right_vn_fqdn }
+                                }],
+          network_policy_entries_policy_rule_src_addresses: [{
+            network_policy_entries_policy_rule_src_addresses_virtual_network: { get_param: left_vn_fqdn }
+                                }],
+          network_policy_entries_policy_rule_action_list: { 
+            network_policy_entries_policy_rule_action_list_simple_action: { get_param: simple_action },
+            network_policy_entries_policy_rule_action_list_apply_service: [{ get_param: service_instance_fq_name }]
+                                },
+        }]
+      }
+
+  left:
+    type: OS::ContrailV2::VirtualNetwork
+    depends_on: [ netpol ]
+    properties:
+      name: { get_param: left_name }
+      network_ipam_refs: [{ get_param: ipam }]
+      network_ipam_refs_data:
+        [{
+          network_ipam_refs_data_ipam_subnets:
+            [{
+              network_ipam_refs_data_ipam_subnets_subnet:
+                {
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix: { get_param: left_cidr },
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len: { get_param: left_mask },
+                },
+               network_ipam_refs_data_ipam_subnets_addr_from_start: 'true',
+        }]
+    }]
+      network_policy_refs: [{ get_param: policy_fq_name }]
+      network_policy_refs_data:
+        [{
+          network_policy_refs_data_sequence:
+            {
+              network_policy_refs_data_sequence_major: 0,
+              network_policy_refs_data_sequence_minor: 0,
+            },
+        }]
+        
+  right:
+    type: OS::ContrailV2::VirtualNetwork
+    depends_on: [ netpol ]
+    properties:
+      name: { get_param: right_name }
+      network_ipam_refs: [{ get_param: ipam }]
+      network_ipam_refs_data:
+        [{
+          network_ipam_refs_data_ipam_subnets:
+            [{
+              network_ipam_refs_data_ipam_subnets_subnet:
+                {
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix: { get_param: right_cidr },
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len: { get_param: right_mask },
+                },
+        network_ipam_refs_data_ipam_subnets_addr_from_start: 'true',
+            }]
+         }]
+      network_policy_refs: [{ get_param: policy_fq_name }]
+      network_policy_refs_data:
+        [{
+          network_policy_refs_data_sequence:
+            {
+              network_policy_refs_data_sequence_major: 0,
+              network_policy_refs_data_sequence_minor: 0,
+            },
+        }]
+
+  svctmpl:
+    type: OS::ContrailV2::ServiceTemplate
+    properties:
+      name: { get_param: service_template_name }
+      service_template_properties:
+        {
+          service_template_properties_version: '2',
+          service_template_properties_service_mode: { get_param: service_template_properties_service_mode },
+          service_template_properties_service_type: { get_param: service_template_properties_service_type },
+          service_template_properties_interface_type:
+            [
+              {
+              service_template_properties_interface_type_service_interface_type: 'left',
+              },
+              {
+              service_template_properties_interface_type_service_interface_type: 'right',
+              }
+            ],
+          service_template_properties_ordered_interfaces: 'true',
+        }
+      domain: { get_param: domain }
+
+  svcinst:
+    type: OS::ContrailV2::ServiceInstance
+    depends_on: [ svctmpl ]
+    properties:
+      name: { get_param: service_instance_name }
+      service_instance_properties:
+        {
+          service_instance_properties_interface_list:
+            [
+              {
+              service_instance_properties_interface_list_virtual_network:
+                {
+                   list_join: [':', { get_attr: [ left, fq_name ] } ]
+                },
+              },
+              {
+              service_instance_properties_interface_list_virtual_network:
+                {
+                   list_join: [':', { get_attr: [ right, fq_name ] } ]
+                },
+              }
+            ],
+        }
+      service_template_refs: [{ get_resource: svctmpl }]
+
+  pt:
+    type: OS::ContrailV2::PortTuple
+    depends_on: [ svcinst ]
+    properties:
+      name: { get_param: pt_name }
+      service_instance: { list_join: [':', { get_attr: [ svcinst, fq_name ] } ] }
+
+  vmi1:
+    type: OS::ContrailV2::VirtualMachineInterface
+    depends_on: [ pt ]
+    properties:
+      port_tuple_refs: [{ get_resource: pt }]
+      virtual_network_refs: [ {get_param: mgmt-net} ]
+  
+  vmi2:
+    type: OS::ContrailV2::VirtualMachineInterface
+    depends_on: [ pt ]
+    properties:
+      virtual_machine_interface_properties:
+        {
+          virtual_machine_interface_properties_service_interface_type: 'left',
+        }
+      port_tuple_refs: [{ get_resource: pt }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ left, fq_name ] } ] }]
+
+  vmi3:
+    type: OS::ContrailV2::VirtualMachineInterface
+    depends_on: [ pt ]
+    properties:
+      virtual_machine_interface_properties:
+        {
+          virtual_machine_interface_properties_service_interface_type: 'right',
+        }
+      port_tuple_refs: [{ get_resource: pt }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ right, fq_name ] } ] }]
+
+  iip1:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi1 ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi1 }]
+      virtual_network_refs: [ {get_param: mgmt-net} ]
+
+  iip2:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi2, left ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi2 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ left, fq_name ] } ] }]
+
+  iip3:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi3, right ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi3 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ right, fq_name ] } ] }]
+
+  instance:
+    type: OS::Nova::Server
+    depends_on: [ iip1, iip2, iip3 ]
+    properties:
+      name: {get_param: svc_name }
+      image: { get_param:  svc_image }
+      flavor: { get_param: svc_flavor }
+      user_data_format: RAW
+      user_data:
+         get_file: './chain_vsrx.txt'
+      networks:
+        - port: { get_resource: vmi1 }
+        - port: { get_resource: vmi2 }
+        - port: { get_resource: vmi3 }
+
+  vmi4:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ left, fq_name ] } ] }]
+  
+  vmi5:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ right, fq_name ] } ] }]
+
+  iip4:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi4, left ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi4 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ left, fq_name ] } ] }]
+
+  iip5:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi5, right ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi5 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ right, fq_name ] } ] }]
+
+  leftvm:
+    type: OS::Nova::Server
+    depends_on: [ iip4 ]
+    properties:
+      name: {get_param: left_vm_name }
+      image: { get_param:  image }
+      flavor: { get_param: flavor }
+      networks:
+        - port: { get_resource: vmi4 }
+
+  rightvm:
+    type: OS::Nova::Server
+    depends_on: [ iip5 ]
+    properties:
+      name: {get_param: right_vm_name }
+      image: { get_param:  image }
+      flavor: { get_param: flavor }
+      networks:
+        - port: { get_resource: vmi5 }
+

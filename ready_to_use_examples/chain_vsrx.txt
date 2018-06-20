@@ -1,0 +1,112 @@
+#junos-config
+version 15.1X49-D110.4;
+system {
+    host-name chain;
+    root-authentication {
+        encrypted-password "$5$qP6oquCR$mRkrO7PjON0GNIobxiGt8zQ7QA7LgrMI4j4nYrhihH."; ## SECRET-DATA
+    }
+    services {
+        ssh {
+            root-login allow;
+        }
+        web-management {
+            http {
+                interface fxp0.0;
+            }
+        }
+    }
+    syslog {
+        user * {
+            any emergency;
+        }
+        file messages {
+            any any;
+            authorization info;
+        }
+        file interactive-commands {
+            interactive-commands any;
+        }
+    }
+    license {
+        autoupdate {
+            url https://ae1.juniper.net/junos/key_retrieval;
+        }
+    }
+}
+security {
+    log {
+        mode stream;
+        report;
+    }
+    policies {
+        from-zone left to-zone right {
+            policy ping {
+                match {
+                    source-address any;
+                    destination-address any;
+                    application junos-ping;
+                }
+                then {
+                    permit;
+                }
+            }
+            policy ssh {
+                match {
+                    source-address any;
+                    destination-address any;
+                    application junos-ssh;
+                }
+                then {
+                    deny;
+                }
+            }
+        }
+    }
+    zones {
+        security-zone left {
+            host-inbound-traffic {
+                system-services {
+                    all;
+                }
+                protocols {
+                    all;
+                }
+            }
+            interfaces {
+                ge-0/0/0.0;
+            }
+        }
+        security-zone right {
+            host-inbound-traffic {
+                system-services {
+                    all;
+                }
+                protocols {
+                    all;
+                }
+            }
+            interfaces {
+                ge-0/0/1.0;
+            }
+        }
+    }
+}
+interfaces {
+    ge-0/0/0 {
+        unit 0 {
+            family inet {
+                dhcp-client;
+            }
+        }
+    }
+    ge-0/0/1 {
+        unit 0 {
+            family inet {
+                dhcp-client;
+            }
+        }
+    }
+    fxp0 {
+        unit 0;
+    }
+}

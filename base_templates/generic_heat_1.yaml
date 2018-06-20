@@ -1,0 +1,24 @@
+test-net:
+    type: OS::Neutron::Net 
+    properties: 
+        name: ‘heat-net’
+
+test-subnet: 
+  type: OS::Neutron::Subnet
+  depends_on: [ test-net ]
+  properties: 
+    name: heat-subnet 
+    network_id: { get_resource: test-net } 
+    cidr: '192.168.1.0/16'
+    enable_dhcp: False 
+    gateway_ip: '192.168.1.1'
+
+server1: 
+  type: OS::Nova::Server 
+  depends_on [test-subnet, test-net]
+  properties: 
+    name: { get_param: myname } 
+    image: { get_param: myimage } 
+    flavor: { get_param: myflavor } 
+    networks: 
+      - network: { get_resource: test-net } 

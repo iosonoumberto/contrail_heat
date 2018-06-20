@@ -1,0 +1,42 @@
+resources:
+
+###VMI AAP WITH CUSTOM MAC
+  vmi_obj:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      name: { get_param: vmi_name }
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ vip_vn, fq_name ] } ] }]
+      virtual_machine_interface_mac_addresses: 
+        {
+            virtual_machine_interface_mac_addresses_mac_address: [{ get_param: mac }],
+        }
+      virtual_machine_interface_allowed_address_pairs: 
+        {
+          virtual_machine_interface_allowed_address_pairs_allowed_address_pair: [{
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip: 
+                {
+                  virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip_ip_prefix: { get_param: aap_ip },
+                  virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip_ip_prefix_len: { get_param: aap_mask },
+                },
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_mac: { get_param: mac },
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_address_mode: { get_param: aap_mode },
+          }]
+        }
+
+###VMI AAP WITH AUTO-GENERATED MAC
+  vmi_obj:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      name: { get_param: vmi_name }
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ vip_vn, fq_name ] } ] }]
+      virtual_machine_interface_allowed_address_pairs: 
+        {
+          virtual_machine_interface_allowed_address_pairs_allowed_address_pair: [{
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip: 
+                {
+                  virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip_ip_prefix: { get_param: aap_ip },
+                  virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip_ip_prefix_len: { get_param: aap_mask },
+                },
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_address_mode: { get_param: aap_mode },
+          }]
+        }
