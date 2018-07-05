@@ -1,0 +1,139 @@
+#junos-config
+system {
+    host-name MIX;
+    root-authentication {
+        encrypted-password "$5$ay9JdOM6$uLakilKesqswZ9cBk7f3ka3K1JC07GY9/vLX5McoBo/"; ## SECRET-DATA
+    }
+    services {
+        ssh;
+        netconf {
+            ssh;
+        }
+        web-management {
+            http {
+                interface fxp0.0;
+            }
+        }
+    }
+    syslog {
+        user * {
+            any emergency;
+        }
+        file messages {
+            any any;
+            authorization info;
+        }
+        file interactive-commands {
+            interactive-commands any;
+        }
+    }
+    license {
+        autoupdate {
+            url https://ae1.juniper.net/junos/key_retrieval;
+        }
+    }
+}
+security {
+    log {
+        mode stream;
+        report;
+    }
+    policies {
+        from-zone left to-zone left {
+            policy l-l {
+                match {
+                    source-address any;
+                    destination-address any;
+                    application any;
+                }
+                then {
+                    permit;
+                }
+            }
+        }
+    }
+    zones {
+        security-zone left {
+            host-inbound-traffic {
+                system-services {
+                    all;
+                }
+                protocols {
+                    all;
+                }
+            }
+            interfaces {
+                ge-0/0/0.0;
+            }
+        }
+    }
+}
+interfaces {
+    ge-0/0/0 {
+        unit 0 {
+            family inet {
+                address 192.168.99.99/24;
+                address 192.168.99.100/24;
+            }
+        }
+    }
+    fxp0 {
+        unit 0 {
+            family inet {
+                dhc-client;
+            }
+        }
+    }
+}
+snmp {
+    community public {
+        authorization read-only;
+    }
+}
+routing-options {
+    static {
+        route 5.170.1.0/24 discard;
+    }
+    autonomous-system 65522;
+}
+protocols {
+    bgp {
+        group bgpaas {
+            type external;
+            import vr_imp;
+            export vr_exp;
+            peer-as 65500;
+            as-override;
+            neighbor 192.168.99.5;
+        }
+    }
+}
+policy-options {
+    prefix-list vrouter {
+        5.170.1.0/24;
+    }
+    policy-statement vr_exp {
+        term 1 {
+            from {
+                protocol static;
+                prefix-list-filter vrouter exact;
+            }
+            then accept;
+        }
+        term rej {
+            then reject;
+        }
+    }
+    policy-statement vr_imp {
+        term 1 {
+            from {
+                protocol bgp;
+            }
+            then accept;
+        }
+        term rej {
+            then reject;
+        }
+    }
+}
+

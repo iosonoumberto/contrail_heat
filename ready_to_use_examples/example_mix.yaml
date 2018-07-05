@@ -1,0 +1,235 @@
+heat_template_version: 2015-04-30
+
+parameters:
+  name:
+    type: string
+  rt:
+    type: string
+  prefix:
+    type: string
+  mask:
+    type: string
+  ipam:
+    type: string
+  flavor:
+    type: string
+  image:
+    type: string
+  flavor2:
+    type: string
+  image2:
+    type: string
+  as_vm:
+    type: string
+  macvm:
+    type: string
+  fwd_mode:
+    type: string
+  dip:
+    type: string
+  sip:
+    type: string
+  dp:
+    type: string
+  sp:
+    type: string
+  proto:
+    type: string
+  ecmp:
+    type: string
+  gw:
+    type: string
+  dhcp:
+    type: string
+  start:
+    type: string
+  end:
+    type: string
+  vip:
+    type: string
+  mode:
+    type: string
+  rti:
+    type: string
+  mgmt-net:
+    type: string
+  ipf:
+    type: string
+
+resources:
+  out_vn:
+    type: OS::ContrailV2::VirtualNetwork
+    properties:
+      name: { get_param: name}
+      network_ipam_refs: [{ get_param: ipam }]
+      virtual_network_properties:
+        {
+          virtual_network_properties_forwarding_mode: { get_param: fwd_mode},
+        }
+      ecmp_hashing_include_fields:
+        {
+          ecmp_hashing_include_fields_destination_ip: { get_param: dip},
+          ecmp_hashing_include_fields_destination_port: { get_param: dp },
+          ecmp_hashing_include_fields_hashing_configured: { get_param: ecmp },
+          ecmp_hashing_include_fields_ip_protocol: { get_param: proto },
+          ecmp_hashing_include_fields_source_ip: { get_param: sip },
+          ecmp_hashing_include_fields_source_port: { get_param: sp },
+        }
+      import_route_target_list:
+        {
+          import_route_target_list_route_target: [ { get_param: rti} ]
+        }
+      route_target_list:
+        {
+          route_target_list_route_target: [{ get_param: rt }],
+        }
+      network_ipam_refs_data:
+        [{
+          network_ipam_refs_data_ipam_subnets:
+            [{
+              network_ipam_refs_data_ipam_subnets_subnet:
+                {
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix: { get_param: prefix },
+                  network_ipam_refs_data_ipam_subnets_subnet_ip_prefix_len: { get_param: mask },
+                },
+                network_ipam_refs_data_ipam_subnets_addr_from_start: 'true' ,
+                network_ipam_refs_data_ipam_subnets_default_gateway: { get_param: gw },
+                network_ipam_refs_data_ipam_subnets_enable_dhcp: { get_param: dhcp },
+                network_ipam_refs_data_ipam_subnets_allocation_pools:
+                  [{
+                    network_ipam_refs_data_ipam_subnets_allocation_pools_start: { get_param: start },
+                    network_ipam_refs_data_ipam_subnets_allocation_pools_end: { get_param: end },
+                  }]
+            }]
+        }]
+
+  vmi1:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ out_vn, fq_name ] } ] }]
+
+  iip_1:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi1, out_vn ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi1 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ out_vn, fq_name ] } ] }]
+      instance_ip_address: { get_param: ipf }
+
+  bgpaas:
+    type: OS::ContrailV2::BgpAsAService
+    properties:
+       virtual_machine_interface_refs: [{ get_resource: vmi1  }]
+       autonomous_system: { get_param: as_vm }
+       bgpaas_session_attributes:
+        {
+           bgpaas_session_attributes_address_families:
+             {
+               bgpaas_session_attributes_address_families_family: ['inet'],
+             },
+        }
+
+  vmi2:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [ {get_param: mgmt-net} ]
+
+  iip_2:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi2 ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi2 }]
+      virtual_network_refs: [{ get_param: mgmt-net }]
+
+  vm_1:
+    type: OS::Nova::Server
+    depends_on: [iip_1, iip_2]
+    properties:
+      name: 'heatvm'
+      image: { get_param: image }
+      flavor: { get_param: flavor }
+      user_data_format: RAW
+      user_data:
+         get_file: './mix_vsrx.txt'
+      networks:
+        - port: { get_resource: vmi2 }
+        - port: { get_resource: vmi1 }
+
+  vmi3:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ out_vn, fq_name ] } ] }]
+      virtual_machine_interface_mac_addresses: 
+        {
+            virtual_machine_interface_mac_addresses_mac_address: [{ get_param: macvm }],
+        }
+      virtual_machine_interface_allowed_address_pairs: 
+        {
+          virtual_machine_interface_allowed_address_pairs_allowed_address_pair: [{
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip: 
+                {
+                  virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip_ip_prefix: { get_param: vip },
+                  virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip_ip_prefix_len: '32',
+                },
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_address_mode: { get_param: mode },
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_mac: { get_param: macvm },
+          }]
+        }
+
+  iip_3:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi3, out_vn ]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi3 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ out_vn, fq_name ] } ] }]
+
+  vm_2:
+    type: OS::Nova::Server
+    depends_on: [iip_3]
+    properties:
+      name: 'cirros1'
+      image: { get_param: image2 }
+      flavor: { get_param: flavor2 }
+      networks:
+        - port: { get_resource: vmi3 }
+      user_data:
+        str_replace:
+          template: |
+             /sbin/ifconfig eth0 up
+             /sbin/ifconfig eth0:0 192.168.99.100 netmask 255.255.255.255 up
+             echo $done
+          params:
+             $done: done
+
+  vmi4:
+    type: OS::ContrailV2::VirtualMachineInterface
+    properties:
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ out_vn, fq_name ] } ] }]
+      virtual_machine_interface_allowed_address_pairs: 
+        {
+          virtual_machine_interface_allowed_address_pairs_allowed_address_pair: [{
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip: 
+                {
+                  virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip_ip_prefix: { get_param: vip },
+                  virtual_machine_interface_allowed_address_pairs_allowed_address_pair_ip_ip_prefix_len: '32',
+                },
+              virtual_machine_interface_allowed_address_pairs_allowed_address_pair_address_mode: { get_param: mode },
+          }]
+        }
+
+  iip_4:
+    type: OS::ContrailV2::InstanceIp
+    depends_on: [ vmi4]
+    properties:
+      virtual_machine_interface_refs: [{ get_resource: vmi4 }]
+      virtual_network_refs: [{ list_join: [':', { get_attr: [ out_vn, fq_name ] } ] }]
+
+  vm_3:
+    type: OS::Nova::Server
+    depends_on: [iip_4]
+    properties:
+      name: 'cirros2'
+      image: { get_param: image2 }
+      flavor: { get_param: flavor2 }
+      networks:
+        - port: { get_resource: vmi4 }
